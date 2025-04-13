@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: staging-motopay-ns
+  labels:
+    name: staging-motopay-ns
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-service-deployment
+  namespace: staging-motopay-ns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecommerce-service
+  template:
+    metadata:
+      labels:
+        app: ecommerce-service
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": linux
+      nodeName: 10.0.1.141
+      containers:
+      - name: ecommerce-service
+        image: swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:15a8d16cacb23ad3b87debb80e5c3c962ad9e3ee
+        imagePullPolicy: "IfNotPresent"
+        ports:
+        - containerPort: 8000
+        envFrom:
+          - secretRef:
+              name: ecommerce-secret
+        resources:
+          requests:
+            cpu: 100m
+            memory: 156Mi
+          limits:
+            cpu: 120m
+            memory: 200Mi
+
+      imagePullSecrets:
+        - name: default-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-service
+  namespace: staging-motopay-ns
+spec:
+  type: NodePort  # Change service type to NodePort
+  selector:
+    app: ecommerce-service
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      # nodePort: 31980  # Define a specific nodePort value (replace with desired port number)
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: kubeissuer-ecommerce
+  namespace: staging-motopay-ns
+spec:
+  acme:
+    # The ACME server URL
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # Email address used for ACME registration
+    email: seun.motopay@gmail.com
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: kubeissuer-ecommerce
+    # Enable the HTTP-01 challenge provider
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kubecert-ecommerce
+  namespace: staging-motopay-ns
+spec:
+  secretName: ecommerce
+  issuerRef:
+    name: kubeissuer-ecommerce
+    kind: ClusterIssuer
+  commonName: ecommerce.staging-api.motopayng.com
+  dnsNames:
+  - ecommerce.staging-api.motopayng.com
+
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ecommerce-ingress
+  namespace: staging-motopay-ns
+  annotations:
+    #cert-manager.io/cluster-issuer: letsencrypt-staging
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: '180'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '180'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '180'
+    #nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - ecommerce.staging-api.motopayng.com
+    secretName: ecommerce
+  rules:
+  - host: ecommerce.staging-api.motopayng.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: ecommerce-service
+            port:
+              number: 8000

@@ -1,0 +1,37 @@
+# Directories
+node_modules/
+
+build/
+/public
+
+# Environment files
+.env
+.env.*
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# Testing frameworks
+coverage/
+
+# Editor specific files
+.vscode/
+.idea/
+
+# Dependency lock files
+# yarn.lock
+# package-lock.json
+
+# Miscellaneous
+.DS_Store
+
+echo "node_modules" >> .gitignore
+
+# Todo
+TODO
+.vercel
+

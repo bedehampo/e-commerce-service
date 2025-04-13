@@ -1,0 +1,1 @@
+export const periculumIncomeQuery = async (userId: string) => {}

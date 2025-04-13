@@ -1,0 +1,111 @@
+# GitHub recommends pinning actions to a commit SHA.
+# To get a newer version, you will need to update the SHA.
+# You can also reference a tag or branch, but the action may change without warning.
+
+name: Build and deploy container app to Huawei cloud - ecommerce-service-mp
+
+on:
+  push:
+    branches:
+      - hw-staging-mp
+  workflow_dispatch:
+
+jobs:
+  Build:
+    name: Build
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+
+    - name: Log in to Huawei Cloud SWR
+      uses: huaweicloud/swr-login@v2.1.0
+      with:
+        access-key-id: ${{ secrets.HW_ACCESS_KEY }}   # Must have created a github secrets containing the access key
+        access-key-secret: ${{ secrets.HW_SECRET_KEY }}   # Must have created a github secrets containing the secret key
+        region: af-south-1
+
+    - name: Build and push Docker image
+      run: |
+        docker build -t swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:${{ github.sha }} .
+        docker push swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:${{ github.sha }}
+    - name: Configure kubectl for Huawei Cloud CCE    ##Must have created a github secrets containing the kubeconfig
+      run: |
+        sudo mkdir -p $HOME/.kube
+        sudo chown -R runner:runner $HOME/.kube
+        export KUBECONFIG=$HOME/.kube/config
+        echo "${{ secrets.KUBE_CONFIG_DATA }}" > $KUBECONFIG    
+    - name: Update deployment
+      run: |    # Updates the deployment.yaml to you the latest  build
+        sed -i "s@swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:[a-z0-9]*@swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:${{ github.sha }}@g" deployment.yaml    
+    - name: Debugging
+      run: |
+        kubectl version
+        kubectl cluster-info
+        kubectl get nodes
+    - name: Deploy to Huawei CCE
+      run: |    # Run your kubectl commands here
+        kubectl apply -f deployment.yaml
+
+
+# # GitHub recommends pinning actions to a commit SHA.
+# # To get a newer version, you will need to update the SHA.
+# # You can also reference a tag or branch, but the action may change without warning.
+
+# name: Build and deploy container app to Huawei cloud - ecommerce-service-mp
+
+# on:
+#   push:
+#     branches:
+#       - hw-staging-mp
+
+# jobs:
+#   Build:
+#     name: Build
+#     runs-on: ubuntu-latest
+#     environment: dev
+
+#     steps:
+#     - uses: actions/checkout@v2
+
+#     - name: Set up Docker Buildx
+#       uses: docker/setup-buildx-action@v2
+
+
+#     - name: Log in to Huawei Cloud SWR
+#       uses: huaweicloud/swr-login@v2.1.0
+#       with:
+#         access-key-id: ${{ secrets.HW_ACCESS_KEY }}   # Must have created a github secrets containing the access key
+#         access-key-secret: ${{ secrets.HW_SECRET_KEY }}   # Must have created a github secrets containing the secret key
+#         region: af-south-1
+
+#     - name: Build and push Docker image
+#       run: |
+#         docker build -t swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:${{ github.sha }} .
+#         docker push swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:${{ github.sha }}
+
+#     - name: Configure kubectl for Huawei Cloud CCE    ##Must have created a github secrets containing the kubeconfig
+#       run: |
+#         sudo mkdir -p $HOME/.kube
+#         sudo chown -R runner:runner $HOME/.kube
+#         export KUBECONFIG=$HOME/.kube/config
+#         echo "${{ secrets.KUBE_CONFIG_DATA }}" > $KUBECONFIG    
+#     - name: Update deployment
+#       run: |    # Updates the deployment.yaml to you the latest  build
+#         sed -i "s@swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:[a-z0-9]*@swr.af-south-1.myhuaweicloud.com/moto/ecommerce-service:${{ github.sha }}@g" deployment.yaml    
+
+
+#     - name: Debugging
+#       run: |
+#         kubectl version
+#         kubectl cluster-info
+#         kubectl get nodes
+
+#     - name: Deploy to Huawei CCE
+#       run: |    # Run your kubectl commands here
+#         kubectl apply -f deployment.yaml
